@@ -1,0 +1,55 @@
+name: Build All GmsCore Modules
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-all:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle permissions
+        run: chmod +x gradlew
+
+      - name: Build all modules
+        env:
+          GRADLE_MICROG_VERSION_WITHOUT_GIT: '1'
+        run: |
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Collect APK AAR JAR
+        if: always()
+        run: |
+          mkdir -p artifacts
+          find . -type f \( \
+            -path '*/build/outputs/apk/*.apk' -o \
+            -path '*/build/outputs/apk/*/*.apk' -o \
+            -path '*/build/outputs/aar/*.aar' -o \
+            -path '*/build/libs/*.jar' \
+          \) -print | while IFS= read -r file; do
+            mkdir -p "artifacts/$(dirname "$file")"
+            cp "$file" "artifacts/$file"
+          done
+
+      - name: Upload build outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GmsCore-All-Build-Outputs
+          path: artifacts/
+          if-no-files-found: warn
